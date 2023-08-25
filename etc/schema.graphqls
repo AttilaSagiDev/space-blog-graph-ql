@@ -1,0 +1,15 @@
+# Copyright © 2023, Open Software License ("OSL") v. 3.0
+
+type Query {
+    blog: [Blog] @resolver(class: "Space\\BlogGraphQl\\Model\\Resolver\\Blog") @doc(description: "Return post list form Space Blog module.")
+}
+
+type Blog @doc(description: "Defines details about an individual blog post.") {
+    blog_id: Int! @doc(description: "The ID for a post.")
+    title: String! @doc(description: "Required. The title of the post.")
+    content: String! @doc(description: "Required. The content of the post.")
+    author: String! @doc(description: "Required. The author of the post.")
+    creation_time: String! @doc(description: "Required. The creation time of the post.")
+    update_time: String! @doc(description: "Required. The update time of the post.")
+    is_active: Int! @doc(description: "Required. Indicates whether post is enabled or not.")
+}
