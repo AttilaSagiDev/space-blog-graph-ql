@@ -15,8 +15,9 @@ use Magento\Framework\GraphQl\Schema\Type\ResolveInfo;
 use Space\Blog\Api\Data\BlogInterface;
 use Space\Blog\Model\Source\IsActive;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\GraphQl\Exception\GraphQlInputException;
 
-class Blog implements ResolverInterface
+class Posts implements ResolverInterface
 {
     /**
      * @var CollectionFactory
@@ -52,6 +53,7 @@ class Blog implements ResolverInterface
      * @param array|null $args
      * @return mixed|void
      * @throws NoSuchEntityException
+     * @throws GraphQlInputException
      */
     public function resolve(
         Field $field,
@@ -60,14 +62,31 @@ class Blog implements ResolverInterface
         array $value = null,
         array $args = null
     ) {
+        $store = $context->getExtensionAttributes()->getStore();
+
+        if (isset($args['currentPage']) && $args['currentPage'] < 1) {
+            throw new GraphQlInputException(__('currentPage value must be greater than 0.'));
+        }
+        if (isset($args['pageSize']) && $args['pageSize'] < 1) {
+            throw new GraphQlInputException(__('pageSize value must be greater than 0.'));
+        }
+
         $postCollection = $this->collectionFactory->create();
-        $postCollection->addStoreFilter((int)$this->storeManager->getStore()->getId())
-            ->addFieldToFilter(BlogInterface::IS_ACTIVE, ['eq' => IsActive::STATUS_ENABLED]);
+        $postCollection->addStoreFilter($store)
+            ->addFieldToFilter(BlogInterface::IS_ACTIVE, ['eq' => IsActive::STATUS_ENABLED])
+            ->setCurPage($args['currentPage'])
+            ->setPageSize($args['pageSize']);
+
+        $collectionSize = $postCollection->getSize();
+        $totalPages = 0;
+        if ($postCollection->getSize() > 0 && $args['pageSize'] > 0) {
+            $totalPages = ceil($collectionSize / $args['pageSize']);
+        }
 
         $blogData = [];
         /** @var BlogInterface $post */
         foreach ($postCollection->getItems() as $post) {
-            $blogData[] = [
+            $blogData['items'][] = [
                 BlogInterface::BLOG_ID => $post->getId(),
                 BlogInterface::TITLE => $post->getTitle(),
                 BlogInterface::CONTENT => $post->getContent(),
@@ -77,6 +96,13 @@ class Blog implements ResolverInterface
                 BlogInterface::IS_ACTIVE => $post->isActive()
             ];
         }
+
+        $blogData['page_info'] = [
+            'total_pages' => $totalPages,
+            'page_size' => $args['pageSize'],
+            'current_page' => $args['currentPage'],
+        ];
+        $blogData['total_count'] = $collectionSize;
 
         return $blogData;
     }
