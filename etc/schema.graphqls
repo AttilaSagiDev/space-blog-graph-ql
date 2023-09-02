@@ -4,14 +4,14 @@ type Query {
     posts (
         pageSize: Int = 20 @doc(description: "Specifies the maximum number of results to return at once. The default value is 20.")
         currentPage: Int = 1 @doc(description: "Specifies which page of results to return. The default value is 1.")
-    ): PostsResult @resolver(class: "Space\\BlogGraphQl\\Model\\Resolver\\Posts") @doc(description: "Return post list from Space Blog module.")
+    ): PostsList @resolver(class: "Space\\BlogGraphQl\\Model\\Resolver\\Posts") @doc(description: "Return post list from Space Blog module.")
 
     getPost (
         blog_id: Int @doc(description: "Specifies the ID of the post.")
     ): Post @resolver(class: "Space\\BlogGraphQl\\Model\\Resolver\\GetPost") @doc(description: "Return post by ID from Space Blog module.")
 }
 
-type PostsResult @doc(description: "Contains a collection of `Posts` objects and pagination information.") {
+type PostsList @doc(description: "Contains a collection of `Posts` objects and pagination information.") {
     items: [Post] @doc(description: "A list of posts that match the filter criteria.")
     page_info: SearchResultPageInfo @doc(description: "An object that includes the `page_info` and `currentPage` values specified in the query.")
     total_count: Int @doc(description: "The total number of posts that match the criteria.")

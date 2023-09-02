@@ -8,39 +8,30 @@ declare(strict_types=1);
 namespace Space\BlogGraphQl\Model\Resolver;
 
 use Magento\Framework\GraphQl\Query\ResolverInterface;
-use Space\Blog\Model\ResourceModel\Blog\CollectionFactory;
-use Magento\Store\Model\StoreManagerInterface;
+use Space\BlogGraphQl\Model\Resolver\DataProvider\PostList as PostListDataProvider;
 use Magento\Framework\GraphQl\Config\Element\Field;
 use Magento\Framework\GraphQl\Schema\Type\ResolveInfo;
-use Space\Blog\Api\Data\BlogInterface;
-use Space\Blog\Model\Source\IsActive;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\GraphQl\Exception\GraphQlInputException;
+use Magento\Framework\GraphQl\Exception\GraphQlNoSuchEntityException;
 
 class Posts implements ResolverInterface
 {
     /**
-     * @var CollectionFactory
+     * @var PostListDataProvider
      */
-    private CollectionFactory $collectionFactory;
-
-    /**
-     * @var StoreManagerInterface
-     */
-    private StoreManagerInterface $storeManager;
+    private PostListDataProvider $postListDataProvider;
 
     /**
      * Constructor
      *
-     * @param CollectionFactory $collectionFactory
-     * @param StoreManagerInterface $storeManager
+     * @param PostListDataProvider $postListDataProvider
      */
     public function __construct(
-        CollectionFactory $collectionFactory,
-        StoreManagerInterface $storeManager
+        PostListDataProvider $postListDataProvider
     ) {
-        $this->collectionFactory = $collectionFactory;
-        $this->storeManager = $storeManager;
+        $this->postListDataProvider = $postListDataProvider;
     }
 
     /**
@@ -51,7 +42,7 @@ class Posts implements ResolverInterface
      * @param ResolveInfo $info
      * @param array|null $value
      * @param array|null $args
-     * @return mixed|void
+     * @return array
      * @throws NoSuchEntityException
      * @throws GraphQlInputException
      */
@@ -61,8 +52,8 @@ class Posts implements ResolverInterface
         ResolveInfo $info,
         array $value = null,
         array $args = null
-    ) {
-        $store = $context->getExtensionAttributes()->getStore();
+    ): array {
+        $storeId = (int)$context->getExtensionAttributes()->getStore()->getId();
 
         if (isset($args['currentPage']) && $args['currentPage'] < 1) {
             throw new GraphQlInputException(__('currentPage value must be greater than 0.'));
@@ -71,39 +62,12 @@ class Posts implements ResolverInterface
             throw new GraphQlInputException(__('pageSize value must be greater than 0.'));
         }
 
-        $postCollection = $this->collectionFactory->create();
-        $postCollection->addStoreFilter($store)
-            ->addFieldToFilter(BlogInterface::IS_ACTIVE, ['eq' => IsActive::STATUS_ENABLED])
-            ->setCurPage($args['currentPage'])
-            ->setPageSize($args['pageSize']);
-
-        $collectionSize = $postCollection->getSize();
-        $totalPages = 0;
-        if ($postCollection->getSize() > 0 && $args['pageSize'] > 0) {
-            $totalPages = ceil($collectionSize / $args['pageSize']);
+        try {
+            $postListData = $this->postListDataProvider->getPostList($args['pageSize'], $args['currentPage'], $storeId);
+        } catch (NoSuchEntityException|LocalizedException $e) {
+            throw new GraphQlNoSuchEntityException(__($e->getMessage()));
         }
 
-        $blogData = [];
-        /** @var BlogInterface $post */
-        foreach ($postCollection->getItems() as $post) {
-            $blogData['items'][] = [
-                BlogInterface::BLOG_ID => $post->getId(),
-                BlogInterface::TITLE => $post->getTitle(),
-                BlogInterface::CONTENT => $post->getContent(),
-                BlogInterface::AUTHOR => $post->getAuthor(),
-                BlogInterface::CREATION_TIME => $post->getCreationTime(),
-                BlogInterface::UPDATE_TIME => $post->getUpdateTime(),
-                BlogInterface::IS_ACTIVE => $post->isActive()
-            ];
-        }
-
-        $blogData['page_info'] = [
-            'total_pages' => $totalPages,
-            'page_size' => $args['pageSize'],
-            'current_page' => $args['currentPage'],
-        ];
-        $blogData['total_count'] = $collectionSize;
-
-        return $blogData;
+        return $postListData;
     }
 }
